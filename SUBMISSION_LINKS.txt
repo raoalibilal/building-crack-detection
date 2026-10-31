@@ -1,0 +1,10 @@
+Building Crack Detection using Deep Learning
+7th Semester Deep Learning Project, Superior University (Gold Campus)
+
+Student:      Ali Bilal
+Roll No:      SU92-BSCSM-F23-213
+Supervisor:   Dr. Munir
+
+GitHub repository:  https://github.com/raoalibilal/building-crack-detection
+Live website:       https://building-crack-detection.vercel.app
+Colab notebook:     https://colab.research.google.com/github/raoalibilal/building-crack-detection/blob/main/Building_Crack_Detection.ipynb

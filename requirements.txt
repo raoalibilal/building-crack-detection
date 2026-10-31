@@ -1,0 +1,7 @@
+tensorflow>=2.15
+huggingface_hub
+numpy
+matplotlib
+scikit-learn
+pillow
+gradio

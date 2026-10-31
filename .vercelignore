@@ -1,0 +1,5 @@
+src/
+models/
+requirements.txt
+data/
+*.zip

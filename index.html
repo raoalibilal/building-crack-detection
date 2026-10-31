@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Building Crack Detection using Deep Learning</title>
+<meta name="description" content="Deep learning system that detects cracks in wall and concrete photos and highlights where they are.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+/* Project details */
+const CONFIG = {
+  github:     "https://github.com/raoalibilal/building-crack-detection",
+  student:    "Ali Bilal",
+  rollNo:     "SU92-BSCSM-F23-213",
+  supervisor: "Dr. Munir"
+};
+</script>
+<style>
+:root {
+  --slab: #eef0f1; --concrete: #dfe2e4; --ink: #1c2226; --rebar: #59626a;
+  --line: #c3c8cc; --crack: #d4241c; --panel: #ffffff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --slab: #1a1e21; --concrete: #23292d; --ink: #e8ebed; --rebar: #a3acb3;
+    --line: #3a4247; --crack: #ff4a3d; --panel: #20262a; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--slab); color: var(--ink);
+  font: 400 17px/1.6 "Barlow", "Segoe UI", Roboto, Arial, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--crack); outline-offset: 3px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+h1, h2 { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-weight: 700; line-height: 1.05; margin: 0; }
+h2 { font-size: clamp(30px, 4vw, 42px); margin-bottom: 18px; }
+h3 { font-size: 19px; margin: 0 0 6px; font-weight: 600; }
+p { margin: 0 0 14px; max-width: 68ch; }
+.muted { color: var(--rebar); }
+
+/* Hero: concrete slab with a crack that draws itself */
+.hero {
+  position: relative; overflow: hidden; background: var(--concrete);
+  padding: calc(env(safe-area-inset-top, 0px) + 88px) 0 96px; border-bottom: 1px solid var(--line);
+}
+.hero::before {
+  content: ""; position: absolute; inset: 0; opacity: .5; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.crack-svg { position: absolute; right: -40px; top: 0; height: 100%; width: 55%; pointer-events: none; }
+.crack-svg path { fill: none; stroke: var(--crack); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: draw 2.2s .3s ease-out forwards; }
+.crack-svg path.branch { stroke-width: 2; animation-delay: 1.4s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .crack-svg path { animation: none; stroke-dashoffset: 0; } }
+.hero .wrap { position: relative; }
+.hero h1 { font-size: clamp(46px, 8vw, 92px); max-width: 11ch; letter-spacing: -.5px; }
+.hero p.lead { font-size: 20px; margin-top: 22px; max-width: 46ch; }
+.hero .who { margin-top: 28px; font-size: 15px; }
+.btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.btn { display: inline-block; padding: 12px 20px; border: 2px solid var(--ink); text-decoration: none; font-weight: 600; border-radius: 3px; }
+.btn.primary { background: var(--ink); color: var(--slab); }
+.btn:hover { background: var(--crack); border-color: var(--crack); color: #fff; }
+
+section { padding: 72px 0; border-bottom: 1px solid var(--line); }
+
+/* Pipeline: a real sequence, so it is numbered */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 3px solid var(--ink); margin-top: 26px; }
+.step { padding: 20px 22px 6px 0; }
+.step + .step { padding-left: 22px; border-left: 1px solid var(--line); }
+.step .n { font: 700 44px/1 "Barlow Condensed", sans-serif; color: var(--crack); display: block; margin-bottom: 10px; }
+
+/* Results */
+.numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 10px 0 34px; }
+.numbers div { background: var(--panel); padding: 18px 20px; }
+.numbers b { display: block; font: 700 38px/1.1 "Barlow Condensed", sans-serif; }
+.numbers span { font-size: 14px; color: var(--rebar); }
+.pending { padding: 18px 20px; border-left: 4px solid var(--crack); background: var(--panel); margin-bottom: 30px; }
+.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px; }
+.gallery figure { margin: 0; }
+.gallery figure.wide { grid-column: 1 / -1; }
+.gallery img { width: 100%; height: auto; display: block; background: var(--panel); border: 1px solid var(--line); }
+.gallery figcaption { font-size: 14px; color: var(--rebar); margin-top: 8px; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 16px; }
+th, td { text-align: left; padding: 11px 14px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; border-bottom: 2px solid var(--ink); }
+
+pre { background: var(--panel); border: 1px solid var(--line); padding: 16px; overflow-x: auto; font-size: 14px; border-radius: 3px; }
+footer { padding: 40px 0 56px; font-size: 15px; }
+
+@media (max-width: 760px) {
+  .steps, .gallery { grid-template-columns: 1fr; }
+  .step + .step { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .crack-svg { width: 90%; opacity: .35; }
+  section { padding: 54px 0; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <svg class="crack-svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path d="M250 -10 L238 40 L252 78 L229 121 L236 160 L210 205 L221 246 L196 290 L204 331 L178 372 L189 410 L161 455 L170 498 L146 545 L152 610"/>
+    <path class="branch" d="M221 246 L252 272 L268 315 L300 338 L311 380"/>
+    <path class="branch" d="M178 372 L146 390 L120 430"/>
+  </svg>
+  <div class="wrap">
+    <h1>Building Crack Detection</h1>
+    <p class="lead">A deep learning system that looks at a photo of a wall or concrete surface, finds cracks, and marks exactly where they are.</p>
+    <div class="btns">
+      <a class="btn primary" id="gh-link" href="#">View code on GitHub</a>
+      <a class="btn" id="colab-link" href="#">Open notebook in Colab</a>
+    </div>
+    <p class="who muted" id="who"></p>
+  </div>
+</header>
+
+<main>
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p>Cracks are early signs of structural damage. Checking them by eye is slow and depends on the inspector. This system does the first check automatically from a single photo.</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h3>Detect</h3><p>EfficientNetB0 decides if the photo has a crack or not, with a confidence score.</p></div>
+      <div class="step"><span class="n">2</span><h3>Locate</h3><p>A U-Net model marks every crack pixel. Large photos are checked tile by tile so thin cracks are not missed.</p></div>
+      <div class="step"><span class="n">3</span><h3>Report</h3><p>Crack area is measured and given a rough severity: Minor, Moderate or Severe.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2>Results</h2>
+    <div id="numbers"></div>
+    <div class="gallery">
+      <figure class="wide"><img src="results/inspector_demo.png" alt="System output with cracks highlighted in red" loading="lazy"><figcaption>Full system output on test photos. Red marks the detected crack.</figcaption></figure>
+      <figure class="wide"><img src="results/segmentation_results.png" alt="Image, true crack mask, predicted mask and overlay" loading="lazy"><figcaption>Crack location: photo, hand-drawn crack, model prediction, overlay.</figcaption></figure>
+      <figure><img src="results/confusion_matrix_roc.png" alt="Confusion matrix and ROC curve" loading="lazy"><figcaption>Confusion matrix and ROC curve on 8,000 test images.</figcaption></figure>
+      <figure><img src="results/model_comparison.png" alt="Accuracy of Custom CNN versus EfficientNetB0" loading="lazy"><figcaption>Baseline CNN vs EfficientNetB0.</figcaption></figure>
+      <figure><img src="results/effnet_curves.png" alt="EfficientNetB0 training curves" loading="lazy"><figcaption>EfficientNetB0 training curves.</figcaption></figure>
+      <figure><img src="results/unet_curves.png" alt="U-Net training curves" loading="lazy"><figcaption>U-Net training curves (Dice score).</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="wrap">
+    <h2>Data and models</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Part</th><th>Dataset</th><th>Model</th></tr>
+        <tr><td>Crack or no crack</td><td>Concrete Crack Images (Özgenel, 2018): 40,000 photos, half with cracks. Split 24,000 / 8,000 / 8,000.</td><td>EfficientNetB0, transfer learning + fine-tuning. Baseline: custom 3-block CNN.</td></tr>
+        <tr><td>Crack location</td><td>800 concrete photos with hand-drawn crack masks. Split 640 / 80 / 80.</td><td>U-Net with pretrained MobileNetV2 encoder. Loss: cross-entropy + Dice.</td></tr>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:18px">Limitations: trained on concrete surfaces, so painted, tiled or very dirty walls can give false alarms. Severity is based on crack area only. This is a screening tool, not a replacement for a structural engineer.</p>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <h2>Run it yourself</h2>
+    <p>Train: open the notebook in Google Colab, choose a T4 GPU, and run all cells (about 30 minutes). Then check any photo:</p>
+<pre>pip install -r requirements.txt
+python src/predict.py wall_photo.jpg</pre>
+    <p class="muted">Prints the result, confidence, crack area and severity, and saves the photo with cracks in red.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap muted">
+    <p>7th Semester Deep Learning Project, Superior University (Gold Campus).<br>
+    Built with Python, TensorFlow / Keras, EfficientNetB0, U-Net and Google Colab.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const repo = CONFIG.github.replace(/\/+$/, "");
+  const m = repo.match(/github\.com\/([^/]+)\/([^/]+)/);
+  document.getElementById("gh-link").href = repo;
+  document.getElementById("colab-link").href = m
+    ? `https://colab.research.google.com/github/${m[1]}/${m[2]}/blob/main/Building_Crack_Detection.ipynb` : repo;
+  document.getElementById("who").textContent =
+    [CONFIG.student, CONFIG.rollNo, "Supervisor: " + CONFIG.supervisor].join(", ");
+
+  document.querySelectorAll(".gallery img").forEach(img => {
+    img.addEventListener("error", () => img.closest("figure").remove());
+  });
+
+  const box = document.getElementById("numbers");
+  const pct = v => (v * 100).toFixed(2) + "%";
+  fetch("results/metrics.json").then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => {
+    const c = d.classification, s = d.segmentation.unet_mobilenetv2;
+    const items = [
+      [pct(c.efficientnet_b0.test_accuracy), "EfficientNetB0 accuracy"],
+      [c.efficientnet_b0.roc_auc.toFixed(4), "ROC-AUC"],
+      [pct(c.custom_cnn.test_accuracy), "Custom CNN accuracy (baseline)"],
+      [s.test_dice.toFixed(3), "Crack location Dice score"],
+      [s.test_iou.toFixed(3), "Crack location IoU"]
+    ];
+    box.className = "numbers";
+    box.innerHTML = items.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+  }).catch(() => {
+    box.className = "pending";
+    box.textContent = "Results show here after the trained results folder is added to the repository.";
+  });
+})();
+</script>
+</body>
+</html>
